@@ -252,6 +252,7 @@ type StartOptions = {
       if (!engineReady) return;
       const worker = workerRef.current;
       if (!worker) return;
+      const isNewFen = lastAnalyzedFenRef.current !== targetFen;
 
       if (
         isAnalyzingRef.current &&
@@ -260,13 +261,11 @@ type StartOptions = {
         pendingRequestRef.current = {
           fen: targetFen,
           preserveMetrics: Boolean(opts?.preserveMetrics),
-          resetDepth: opts?.resetDepth ?? isNewPosition,
+          resetDepth: opts?.resetDepth ?? isNewFen,
         };
         worker.postMessage("stop");
         return;
       }
-
-      const isNewFen = lastAnalyzedFenRef.current !== targetFen;
       if (isNewFen || opts?.resetDepth) {
         currentDepthRef.current = minDepthRef.current;
       }
@@ -335,4 +334,8 @@ type StartOptions = {
 
   return snapshot;
 }
+
+
+
+
 
