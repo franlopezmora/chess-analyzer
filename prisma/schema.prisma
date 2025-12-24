@@ -1,0 +1,217 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GameResult {
+  WHITE_WIN
+  BLACK_WIN
+  DRAW
+  UNKNOWN
+}
+
+enum AnalysisStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+enum MoveClassification {
+  BOOK
+  BEST
+  GOOD
+  INACCURACY
+  MISTAKE
+  BLUNDER
+  UNKNOWN
+}
+
+enum JobStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String?   @unique
+  emailVerified  DateTime?
+  image          String?
+  bio            String?
+  locale         String?   @default("es-AR")
+  passwordHash   String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  accounts       Account[]
+  sessions       Session[]
+  games          Game[]
+  tags           Tag[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model Game {
+  id            String          @id @default(cuid())
+  userId        String
+  title         String?
+  opponent      String?
+  event         String?
+  site          String?
+  date          DateTime?
+  result        GameResult      @default(UNKNOWN)
+  eco           String?
+  opening       String?
+  termination   String?
+  timeControl   String?
+  source        String?
+  status        AnalysisStatus  @default(PENDING)
+  pgn           String
+  accuracy      Float?
+  blunders      Int?
+  mistakes      Int?
+  inaccuracies  Int?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user     User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  moves    Move[]
+  analysis Analysis?
+  tags     GameTag[]
+  jobs     Job[]
+
+  @@index([userId, createdAt])
+}
+
+model Move {
+  id        String   @id @default(cuid())
+  gameId    String
+  ply       Int
+  san       String
+  fen       String?
+  comment   String?
+  clock     String?
+  createdAt DateTime @default(now())
+
+  game     Game          @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  analysis MoveAnalysis?
+
+  @@index([gameId, ply])
+}
+
+model Analysis {
+  id                   String          @id @default(cuid())
+  gameId               String          @unique
+  engine               String?
+  depth                Int?
+  averageCentipawnLoss Float?
+  totalTimeMs          Int?
+  completedAt          DateTime?
+  createdAt            DateTime        @default(now())
+
+  game      Game            @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  moves     MoveAnalysis[]
+}
+
+model MoveAnalysis {
+  id              String            @id @default(cuid())
+  analysisId      String
+  moveId          String            @unique
+  evaluationCp    Int?
+  bestMove        String?
+  comment         String?
+  classification  MoveClassification @default(UNKNOWN)
+  createdAt       DateTime           @default(now())
+
+  analysis Analysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  move     Move     @relation(fields: [moveId], references: [id], onDelete: Cascade)
+
+}
+
+model Tag {
+  id        String    @id @default(cuid())
+  userId    String
+  label     String
+  slug      String?
+  color     String?   @default("#5b21b6")
+  createdAt DateTime  @default(now())
+
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  games GameTag[]
+
+  @@unique([userId, label])
+}
+
+model GameTag {
+  gameId     String
+  tagId      String
+  assignedAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([gameId, tagId])
+}
+
+model Job {
+  id          String     @id @default(cuid())
+  gameId      String
+  status      JobStatus  @default(PENDING)
+  payload     Json?
+  error       String?
+  attempts    Int        @default(0)
+  startedAt   DateTime?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+}
