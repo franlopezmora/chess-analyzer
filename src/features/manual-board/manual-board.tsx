@@ -344,7 +344,11 @@ export function ManualBoard() {
         move: { from: from as Square, to: to as Square },
       };
 
+<<<<<<< HEAD
       // Mantener las ramas existentes y agregar la nueva.
+=======
+      const parentHadChildren = baseNode.children.length > 0;
+>>>>>>> 6bf758a (chore: prepare chess analyzer)
       const nextNodes = {
         ...workingNodes,
         [baseNodeId]: {
@@ -354,6 +358,7 @@ export function ManualBoard() {
         [newNodeId]: newNode,
       };
 
+<<<<<<< HEAD
       if (baseNode.children.length === 0) {
         setPreferredChildren((prevPref) => ({ ...prevPref, [baseNodeId]: newNodeId }));
       }
@@ -361,6 +366,13 @@ export function ManualBoard() {
       setChildPicker(null);
       setCurrentNodeId(newNodeId);
 
+=======
+      if (!parentHadChildren) {
+        setPreferredChildren((prevPref) => ({ ...prevPref, [baseNodeId]: newNodeId }));
+      }
+      setChildPicker(null);
+      setCurrentNodeId(newNodeId);
+>>>>>>> 6bf758a (chore: prepare chess analyzer)
       if (shouldReset) {
         setPreferredChildren({});
         setPgnInput("");
