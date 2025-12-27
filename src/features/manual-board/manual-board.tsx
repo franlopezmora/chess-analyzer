@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
   type ComponentType,
+  type KeyboardEvent,
   type ReactNode,
 } from "react";
 import {
@@ -93,26 +94,12 @@ export function ManualBoard() {
   } | null>(null);
   const [pgnInput, setPgnInput] = useState("");
   const [pgnError, setPgnError] = useState<string | null>(null);
-  const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [suggestionLockId, setSuggestionLockId] = useState<number | null>(null);
-  const [gameDetails, setGameDetails] = useState({
-    whitePlayer: "",
-    whiteScore: "",
-    blackPlayer: "",
-    blackScore: "",
-    result: "*",
-    event: "",
-    timeControl: "",
-    termination: "",
-    site: "",
-    round: "",
-    eco: "",
-    date: "",
-  });
   const [openSection, setOpenSection] = useState<string | null>(null);
   const [hideStartMenu, setHideStartMenu] = useState(false);
   const [boardHeight, setBoardHeight] = useState(0);
   const boardShellRef = useRef<HTMLDivElement | null>(null);
+  const movesCountRef = useRef(0);
   const [promotionRequest, setPromotionRequest] = useState<{
     from: Square;
     to: Square;
@@ -368,8 +355,9 @@ export function ManualBoard() {
       return nextNodes;
     });
 
-    if (didMove && !hideStartMenu) {
+    if (didMove) {
       setHideStartMenu(true);
+      setOpenSection(null);
     }
     return didMove;
   };
@@ -548,13 +536,18 @@ export function ManualBoard() {
   // incluso si ya hay movimientos creados (permite volver a las opciones).
   const showStartMenu = !hideStartMenu;
   const onboardingSections = [
-    { id: "pgn", label: "Cargar desde FEN/PGN", description: "Pegá la partida antes de empezar y después seguí con tus propias variantes." },
-    { id: "moves", label: "Hacer movimientos", description: "Arrastrá piezas legales sobre el tablero para recrear una partida o analizar variantes." },
-    { id: "setup", label: "Configurar posición", description: "Próximamente podrás editar piezas casilla por casilla para estudiar situaciones concretas." },
-    { id: "collections", label: "Colecciones de partidas", description: "Guarda sets temáticos (aperturas, tácticas) para cargarlos rápido." },
-    { id: "history", label: "Cargar del historial de partidas", description: "Integrá tu cuenta de Lichess o Chess.com para reconstruir partidas reales." },
-    { id: "study", label: "Importar estudio", description: "Trae capítulos enteros con anotaciones y compártelos fácilmente." },
-    { id: "analysis", label: "Cargar análisis anterior", description: "Volvé a una sesión guardada para seguir donde la dejaste." },
+    {
+      id: "pgn",
+      label: "Cargar desde PGN",
+      description:
+        "Pegá la partida y seguí con tus variantes manuales.",
+    },
+    {
+      id: "moves",
+      label: "Hacer movimientos",
+      description:
+        "Arrastrá piezas legales para recrear o analizar posiciones.",
+    },
   ];
 
   const handleImportPgn = () => {
@@ -611,16 +604,33 @@ export function ManualBoard() {
     setPreferredChildren({});
     setChildPicker(null);
     setPgnError(null);
+    setHideStartMenu(true);
+    setOpenSection(null);
   };
 
-  const handleDetailsChange = (field: keyof typeof gameDetails, value: string) => {
-    setGameDetails((prev) => ({ ...prev, [field]: value }));
+  const handlePgnKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    const isPlainEnter =
+      event.key === "Enter" &&
+      !event.shiftKey &&
+      !event.ctrlKey &&
+      !event.altKey &&
+      !event.metaKey;
+    if (isPlainEnter) {
+      event.preventDefault();
+      handleImportPgn();
+    }
   };
 
-  const handleSaveDetails = () => {
-    // En una versión futura podríamos persistir estos datos junto con el PGN.
-    setIsDetailsOpen(false);
-  };
+  useEffect(() => {
+    const moveCount = nodes[ROOT_ID]?.children.length ?? 0;
+    const prev = movesCountRef.current;
+    movesCountRef.current = moveCount;
+    // Si el menú estaba abierto y se realiza una nueva jugada, lo cerramos.
+    if (moveCount > prev && !hideStartMenu) {
+      setHideStartMenu(true);
+      setOpenSection(null);
+    }
+  }, [nodes, hideStartMenu]);
 
 
   type VariationGroup = {
@@ -994,13 +1004,6 @@ type VariationToken = {
           >
             ← Opciones
           </button>
-          <button
-            type="button"
-            className="viewer-button viewer-button--primary"
-            onClick={() => setIsDetailsOpen(true)}
-          >
-            Guardar partida
-          </button>
         </div>
         {showStartMenu && (
           <div className="rounded-3xl border border-slate-800 p-4">
@@ -1038,6 +1041,8 @@ type VariationToken = {
                             placeholder="1. d4 d5 2. c4 e6 3. Nc3 ..."
                             value={pgnInput}
                             onChange={(event) => setPgnInput(event.target.value)}
+                            style={{ resize: "none" }}
+                            onKeyDown={handlePgnKeyDown}
                           />
                           {pgnError ? (
                             <p className="mt-2 text-xs text-red-400">{pgnError}</p>
@@ -1190,132 +1195,6 @@ type VariationToken = {
           </ol>
         </div>
       </div>
-      {isDetailsOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-md rounded-3xl bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-start justify-between">
-              <h3 className="text-lg font-semibold">Detalles de la partida</h3>
-              <button
-                type="button"
-                className="text-muted hover:text-foreground"
-                onClick={() => setIsDetailsOpen(false)}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="mt-4 space-y-3 text-sm">
-              <div className="grid gap-2">
-                <label className="text-xs text-muted">Jugador con blancas</label>
-                <div className="flex gap-2">
-                  <input
-                    className="flex-1 rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                    value={gameDetails.whitePlayer}
-                    onChange={(e) => handleDetailsChange("whitePlayer", e.target.value)}
-                    placeholder="Nombre"
-                  />
-                  <input
-                    className="w-24 rounded-2xl border border-slate-700 bg-transparent px-3 py-2 text-center"
-                    value={gameDetails.whiteScore}
-                    onChange={(e) => handleDetailsChange("whiteScore", e.target.value)}
-                    placeholder="Puntaje"
-                  />
-                </div>
-              </div>
-              <div className="grid gap-2">
-                <label className="text-xs text-muted">Jugador con negras</label>
-                <div className="flex gap-2">
-                  <input
-                    className="flex-1 rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                    value={gameDetails.blackPlayer}
-                    onChange={(e) => handleDetailsChange("blackPlayer", e.target.value)}
-                    placeholder="Nombre"
-                  />
-                  <input
-                    className="w-24 rounded-2xl border border-slate-700 bg-transparent px-3 py-2 text-center"
-                    value={gameDetails.blackScore}
-                    onChange={(e) => handleDetailsChange("blackScore", e.target.value)}
-                    placeholder="Puntaje"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="text-xs text-muted">Resultado</label>
-                <select
-                  className="mt-1 w-full rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                  value={gameDetails.result}
-                  onChange={(e) => handleDetailsChange("result", e.target.value)}
-                >
-                  <option value="*">Sin resultados</option>
-                  <option value="1-0">1-0</option>
-                  <option value="0-1">0-1</option>
-                  <option value="½-½">½ - ½</option>
-                </select>
-              </div>
-              <input
-                className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                placeholder="Evento"
-                value={gameDetails.event}
-                onChange={(e) => handleDetailsChange("event", e.target.value)}
-              />
-              <input
-                className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                placeholder="Control de tiempo"
-                value={gameDetails.timeControl}
-                onChange={(e) => handleDetailsChange("timeControl", e.target.value)}
-              />
-              <input
-                className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                placeholder="Cancelación"
-                value={gameDetails.termination}
-                onChange={(e) => handleDetailsChange("termination", e.target.value)}
-              />
-              <input
-                className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                placeholder="Ubicación"
-                value={gameDetails.site}
-                onChange={(e) => handleDetailsChange("site", e.target.value)}
-              />
-              <div className="grid grid-cols-3 gap-2">
-                <input
-                  className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                  placeholder="Ronda"
-                  value={gameDetails.round}
-                  onChange={(e) => handleDetailsChange("round", e.target.value)}
-                />
-                <input
-                  className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                  placeholder="ECO"
-                  value={gameDetails.eco}
-                  onChange={(e) => handleDetailsChange("eco", e.target.value)}
-                />
-                <input
-                  type="date"
-                  className="rounded-2xl border border-slate-700 bg-transparent px-3 py-2"
-                  placeholder="Fecha"
-                  value={gameDetails.date}
-                  onChange={(e) => handleDetailsChange("date", e.target.value)}
-                />
-              </div>
-            </div>
-            <div className="mt-6 flex items-center justify-between">
-              <button
-                type="button"
-                className="viewer-button"
-                onClick={() => setIsDetailsOpen(false)}
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                className="viewer-button viewer-button--primary"
-                onClick={handleSaveDetails}
-              >
-                Guardar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
       {promotionRequest && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
           <div className="w-full max-w-sm rounded-3xl bg-slate-900 p-6 shadow-2xl">
@@ -1331,46 +1210,6 @@ type VariationToken = {
             </div>
             <p className="mt-2 text-sm text-muted">
               Coronar peón{" "}
-              {promotionRequest.color === "white" ? "blanco" : "negro"}.
-            </p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              {promotionPieces.map(({ key, label }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className="rounded-2xl border border-slate-700 bg-slate-800/40 px-4 py-3 text-sm font-semibold transition hover:bg-slate-800"
-                  onClick={() => confirmPromotion(key)}
-                >
-                  {label}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="mt-4 w-full rounded-2xl border border-slate-700 px-4 py-2 text-sm"
-              onClick={cancelPromotion}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-      {promotionRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-slate-900 p-6 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Coronar peón</h3>
-              <button
-                type="button"
-                className="text-muted hover:text-foreground"
-                onClick={cancelPromotion}
-                aria-label="Cancelar coronación"
-              >
-                ✕
-              </button>
-            </div>
-            <p className="mt-2 text-sm text-muted">
-              Elegí la pieza para el peón{" "}
               {promotionRequest.color === "white" ? "blanco" : "negro"}.
             </p>
             <div className="mt-4 grid grid-cols-2 gap-3">

@@ -30,7 +30,7 @@ const themeInitializer = `
 export const metadata: Metadata = {
   title: "Chess Analyzer",
   description:
-    "Analizador de partidas con login seguro y pipeline de evaluación.",
+    "Analizador de partidas con pipeline de evaluación y tablero interactivo.",
 };
 
 export default function RootLayout({
