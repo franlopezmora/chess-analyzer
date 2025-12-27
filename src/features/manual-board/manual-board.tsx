@@ -451,7 +451,7 @@ export function ManualBoard() {
   }, [childPicker, currentNodeId]);
 
   useEffect(() => {
-    const handler = (event: KeyboardEvent) => {
+    const handler = (event: globalThis.KeyboardEvent) => {
       if (activeChildPicker) {
         if (event.key === "ArrowUp") {
           event.preventDefault();
